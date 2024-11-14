@@ -145,22 +145,19 @@ Add `load_run: <project_name>/<log_run_name>`to your .yaml config file in `vint_
 If you want to use our checkpoints, you can download the `*.pth` files from [this link](https://drive.google.com/drive/folders/1a9yWR2iooXFAqjQHetz263--4_2FFggg?usp=sharing).
 
 
-## Deployment
+## Deployment for go2
+
 This subfolder contains code to load a pre-trained ViNT and deploy it on the open-source [LoCoBot indoor robot platform](http://www.locobot.org/) with a [NVIDIA Jetson Orin Nano](https://www.amazon.com/NVIDIA-Jetson-Orin-Nano-Developer/dp/B0BZJTQ5YP/ref=asc_df_B0BZJTQ5YP/?tag=hyprod-20&linkCode=df0&hvadid=652427572954&hvpos=&hvnetw=g&hvrand=12520404772764575478&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=1013585&hvtargid=pla-2112361227514&psc=1&gclid=CjwKCAjw4P6oBhBsEiwAKYVkq7dqJEwEPz0K-H33oN7MzjO0hnGcAJDkx2RdT43XZHdSWLWHKDrODhoCmnoQAvD_BwE). It can be easily adapted to be run on alternate robots, and researchers have been able to independently deploy it on the following robots – Clearpath Jackal, DJI Tello, Unitree A1, TurtleBot2, Vizbot – and in simulated environments like CARLA.
 
-### LoCoBot Setup
+### go2 Setup
+1. go2's networlk is configured to use a static IP address. The IP address is 192.168.123.161,so we need to set the static IP address of the Jetson to 192.168.123.x, where x is an integer between 2 and 254.
+2.  
 
-This software was tested on a LoCoBot running Ubuntu 20.04.
+
 
 
 #### Software Installation (in this order)
-1. ROS: [ros-noetic](https://wiki.ros.org/noetic/Installation/Ubuntu)
-2. ROS packages: 
-    ```bash
-    sudo apt-get install ros-noetic-usb-cam ros-noetic-joy
-    ```
-3. [kobuki](http://wiki.ros.org/kobuki/Tutorials/Installation)
-4. Conda 
+1. Conda 
     - Install anaconda/miniconda/etc. for managing environments
     - Make conda env with environment.yml (run this inside the `vint_release/` directory)
         ```bash
@@ -174,23 +171,50 @@ This software was tested on a LoCoBot running Ubuntu 20.04.
         ```bash
         echo “conda activate vint_deployment” >> ~/.bashrc 
         ```
-5. Install the `vint_train` packages (run this inside the `vint_release/` directory):
+2. Install the `vint_train` packages (run this inside the `vint_release/` directory):
     ```bash
     pip install -e train/
     ```
-6. Install the `diffusion_policy` package from this [repo](https://github.com/real-stanford/diffusion_policy):
+3. Install the `unitree_sdk2_python` from  the [link](https://github.com/unitreerobotics/unitree_sdk2_python)
+   ```bash
+    git clone https://github.com/unitreerobotics/unitree_sdk2_python.git
+    cd unitree_sdk2_python
+    pip3 install -e .
+    ```
+    #### FAQ
+    #####  `pip3 install -e .` 遇到报错
+    ```bash
+    Could not locate cyclonedds. Try to set CYCLONEDDS_HOME or CMAKE_PREFIX_PATH
+    ```
+    This error mentions that the cyclonedds path could not be found. First compile and install cyclonedds:
+    ```bash
+    cd ~
+    git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x 
+    cd cyclonedds && mkdir build install && cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=../install
+    cmake --build . --target install
+    ```
+    进入 unitree_sdk2_python 目录，设置 `CYCLONEDDS_HOME` 为刚刚编译好的 cyclonedds 所在路径，再安装 unitree_sdk2_python
+    ```bash
+    cd ~/unitree_sdk2_python
+    export CYCLONEDDS_HOME="~/cyclonedds/install"
+    pip3 install -e .
+    ```
+4. Install the `diffusion_policy` package from this [repo](https://github.com/real-stanford/diffusion_policy):
     ```bash
     git clone git@github.com:real-stanford/diffusion_policy.git
     pip install -e diffusion_policy/
     ```
-7. (Recommended) Install [tmux](https://github.com/tmux/tmux/wiki/Installing) if not present.
+5. (Recommended) Install [tmux](https://github.com/tmux/tmux/wiki/Installing) if not present.
     Many of the bash scripts rely on tmux to launch multiple screens with different commands. This will be useful for debugging because you can see the output of each screen.
 
 #### Hardware Requirements
-- LoCoBot: http://locobot.org (just the navigation stack)
-- A wide-angle RGB camera: [Example](https://www.amazon.com/ELP-170degree-Fisheye-640x480-Resolution/dp/B00VTHD17W). The `vint_locobot.launch` file uses camera parameters that work with cameras like the ELP fisheye wide angle, feel free to modify to your own. Adjust the camera parameters in `vint_release/deployment/config/camera.yaml` your camera accordingly (used for visualization).
-- [Joystick](https://www.amazon.com/Logitech-Wireless-Nano-Receiver-Controller-Vibration/dp/B0041RR0TW)/[keyboard teleop](http://wiki.ros.org/teleop_twist_keyboard) that works with Linux. Add the index mapping for the _deadman_switch_ on the joystick to the `vint_release/deployment/config/joystick.yaml`. You can find the mapping from buttons to indices for common joysticks in the [wiki](https://wiki.ros.org/joy). 
 
+  Since go2 has a remote control and camera,the logic associated with the remote control and camera is not needed.
+  
+~~- LoCoBot: http://locobot.org (just the navigation stack)~~
+~~- A wide-angle RGB camera: [Example](https://www.amazon.com/ELP-170degree-Fisheye-640x480-Resolution/dp/B00VTHD17W). The `vint_locobot.launch` file uses camera parameters that work with cameras like the ELP fisheye wide angle, feel free to modify to your own. Adjust the camera parameters in `vint_release/deployment/config/camera.yaml` your camera accordingly (used for visualization).~~
+~~- [Joystick](https://www.amazon.com/Logitech-Wireless-Nano-Receiver-Controller-Vibration/dp/B0041RR0TW)/[keyboard teleop](http://wiki.ros.org/teleop_twist_keyboard) that works with Linux. Add the index mapping for the _deadman_switch_ on the joystick to the `vint_release/deployment/config/joystick.yaml`. You can find the mapping from buttons to indices for common joysticks in the [wiki](https://wiki.ros.org/joy). ~~
 
 ### Loading the model weights
 
@@ -208,14 +232,13 @@ This section discusses a simple way to create a topological map of the target en
 ./record_bag.sh <bag_name>
 ```
 
-Run this command to teleoperate the robot with the joystick and camera. This command opens up three windows 
-1. `roslaunch vint_locobot.launch`: This launch file opens the `usb_cam` node for the camera, the joy node for the joystick, and nodes for the robot’s mobile base.
-2. `python joy_teleop.py`: This python script starts a node that reads inputs from the joy topic and outputs them on topics that teleoperate the robot’s base.
-3. `rosbag record /usb_cam/image_raw -o <bag_name>`: This command isn’t run immediately (you have to click Enter). It will be run in the vint_release/deployment/topomaps/bags directory, where we recommend you store your rosbags.
+Run this command to video stream from go2 camera and to record the video stream information via rosbag. This command opens up two windows 
+1. `python video_stream_publisher.py`: This is the video stream from the go2 camera.
+2. `rosbag record <your_image_topic> -o <bag_name>`: This command isn’t run immediately (you have to click Enter). It will be run in the vint_release/deployment/topomaps/bags directory, where we recommend you store your rosbags.
 
 Once you are ready to record the bag, run the `rosbag record` script and teleoperate the robot on the map you want the robot to follow. When you are finished with recording the path, kill the `rosbag record` command, and then kill the tmux session.
 
-#### Make the topological map: 
+#### Make the topological map:
 ```bash
 ./create_topomap.sh <topomap_name> <bag_filename>
 ```
@@ -250,18 +273,18 @@ The `<topomap_dir>` is the name of the directory in `vint_release/deployment/top
 
 This command opens up 4 windows:
 
-1. `roslaunch vint_locobot.launch`: This launch file opens the usb_cam node for the camera, the joy node for the joystick, and several nodes for the robot’s mobile base).
-2. `python navigate.py --model <model_name> -—dir <topomap_dir>`: This python script starts a node that reads in image observations from the `/usb_cam/image_raw` topic, inputs the observations and the map into the model, and publishes actions to the `/waypoint` topic.
-3. `python joy_teleop.py`: This python script starts a node that reads inputs from the joy topic and outputs them on topics that teleoperate the robot’s base.
-4. `python pd_controller.py`: This python script starts a node that reads messages from the `/waypoint` topic (waypoints from the model) and outputs velocities to navigate the robot’s base.
+1. `python video_stream_publisher.py`: This is the video stream from the go2 camera.
+2. `python navigate.py --model <model_name> -—dir <topomap_dir>`: This python script starts a node that reads in image observations from the ` ` topic, inputs the observations and the map into the model, and publishes actions to the `/waypoint` topic.
 
-When the robot is finishing navigating, kill the `pd_controller.py` script, and then kill the tmux session. If you want to take control of the robot while it is navigating, the `joy_teleop.py` script allows you to do so with the joystick.
+3. `python pd_controller.py`: This python script starts a node that reads messages from the `/waypoint` topic (waypoints from the model) and outputs velocities to navigate the robot’s base.
+
+4. `python go2_control.py`: This python script will subscribe in the velocities from the `/cmd_vel_mux/input/navi` topic and then through the unitree_sdk, it will send the velocities to the robot.
 
 #### Exploration
 _Make sure to run this script inside the `vint_release/deployment/src/` directory._
 
 ```bash
-./exploration.sh “--model <model_name>”
+./explore.sh “--model <model_name>”
 ```
 
 To deploy one of the models from the published results, we are releasing model checkpoints that you can download from [this link](https://drive.google.com/drive/folders/1a9yWR2iooXFAqjQHetz263--4_2FFggg?usp=sharing).
@@ -278,12 +301,13 @@ The `<topomap_dir>` is the name of the directory in `vint_release/deployment/top
 
 This command opens up 4 windows:
 
-1. `roslaunch vint_locobot.launch`: This launch file opens the usb_cam node for the camera, the joy node for the joystick, and several nodes for the robot’s mobile base.
-2. `python explore.py --model <model_name>`: This python script starts a node that reads in image observations from the `/usb_cam/image_raw` topic, inputs the observations and the map into the model, and publishes exploration actions to the `/waypoint` topic.
-3. `python joy_teleop.py`: This python script starts a node that reads inputs from the joy topic and outputs them on topics that teleoperate the robot’s base.
-4. `python pd_controller.py`: This python script starts a node that reads messages from the `/waypoint` topic (waypoints from the model) and outputs velocities to navigate the robot’s base.
+1.`python video_stream_publisher.py`: This is the video stream from the go2 camera..
+2. `python explore.py --model <model_name>`: This python script starts a node that reads in image observations from the `/robot/front_camera/image_raw` topic, inputs the observations and the map into the model, and publishes exploration actions to the `/waypoint` topic.
+3. `python pd_controller.py`: This python script starts a node that reads messages from the `/waypoint` topic (waypoints from the model) and outputs velocities to navigate the robot’s base.
 
-When the robot is finishing navigating, kill the `pd_controller.py` script, and then kill the tmux session. If you want to take control of the robot while it is navigating, the `joy_teleop.py` script allows you to do so with the joystick.
+4. `python go2_control.py`: This python script will subscribe in the velocities from the `/cmd_vel_mux/input/navi` topic and then through the unitree_sdk, it will send the velocities to the robot.
+
+When the robot is finishing navigating, kill the `go2_control.py` script, and then kill the tmux session.
 
 
 ### Adapting this code to different robots

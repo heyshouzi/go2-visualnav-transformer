@@ -27,6 +27,7 @@ def remove_files_in_dir(dir_path: str):
 
 def callback_obs(msg: Image):
     global obs_img
+
     obs_img = msg_to_pil(msg)
 
 
