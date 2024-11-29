@@ -1,4 +1,3 @@
-
 import os
 import pickle
 from PIL import Image
@@ -8,8 +7,9 @@ import tqdm
 import yaml
 import rosbag
 
-# utils
 from vint_train.process_data.process_data_utils import *
+
+
 
 
 def main(args: argparse.Namespace):
@@ -44,18 +44,19 @@ def main(args: argparse.Namespace):
         traj_name = "_".join(bag_path.split("/")[-2:])[:-4]
 
         # load the hdf5 file
-        bag_img_data, bag_traj_data = get_images_and_odom(
+        bag_img_data, bag_traj_data, bag_lidar_data = get_images_odom_and_lidar(
             b,
             config[args.dataset_name]["imtopics"],
             config[args.dataset_name]["odomtopics"],
+            config[args.dataset_name]["lidartopics"],  # 假设你在配置文件中有设置LiDAR话题
             eval(config[args.dataset_name]["img_process_func"]),
             eval(config[args.dataset_name]["odom_process_func"]),
+            eval(config[args.dataset_name]["lidar_process_func"]),
             rate=args.sample_rate,
             ang_offset=config[args.dataset_name]["ang_offset"],
         )
 
-  
-        if bag_img_data is None or bag_traj_data is None:
+        if bag_img_data is None or bag_traj_data is None or bag_lidar_data is None:
             print(
                 f"{bag_path} did not have the topics we were looking for. Skipping..."
             )
@@ -63,17 +64,25 @@ def main(args: argparse.Namespace):
         # remove backwards movement
         cut_trajs = filter_backwards(bag_img_data, bag_traj_data)
 
-        for i, (img_data_i, traj_data_i) in enumerate(cut_trajs):
+        for i, (img_data_i, traj_data_i, lidar_data_i) in enumerate(cut_trajs):
             traj_name_i = traj_name + f"_{i}"
             traj_folder_i = os.path.join(args.output_dir, traj_name_i)
             # make a folder for the traj
             if not os.path.exists(traj_folder_i):
                 os.makedirs(traj_folder_i)
+
+            # save trajectory data
             with open(os.path.join(traj_folder_i, "traj_data.pkl"), "wb") as f:
                 pickle.dump(traj_data_i, f)
+
             # save the image data to disk
             for i, img in enumerate(img_data_i):
                 img.save(os.path.join(traj_folder_i, f"{i}.jpg"))
+
+            # save LiDAR data as PLY
+            lidar_pcd_filename = os.path.join(traj_folder_i, "lidar_points.ply")
+            save_point_cloud_to_ply(lidar_data_i, lidar_pcd_filename)
+
 
 
 if __name__ == "__main__":

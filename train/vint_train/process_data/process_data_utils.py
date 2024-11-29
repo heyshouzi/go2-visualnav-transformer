@@ -5,10 +5,31 @@ import rosbag
 from PIL import Image
 import cv2
 from typing import Any, Tuple, List, Dict
+import open3d as o3d
+import pcl
+import sensor_msgs.point_cloud2 as pc2
+import numpy as np
+from pcl import PointCloud
 import torchvision.transforms.functional as TF
 
 IMAGE_SIZE = (160, 120)
 IMAGE_ASPECT_RATIO = 4 / 3
+
+
+def save_point_cloud_to_ply(point_cloud, output_path):
+    """
+    将点云保存为PLY格式
+    :param point_cloud: 一个(N, 3)的numpy数组，包含点云坐标
+    :param output_path: 输出路径，保存为PLY文件
+    """
+    # 创建一个open3d点云对象
+    pcd = o3d.geometry.PointCloud()
+    # 设置点云坐标
+    pcd.points = o3d.utility.Vector3dVector(point_cloud)
+    # 保存PLY文件
+    o3d.io.write_point_cloud(output_path, pcd)
+# utils
+
 
 
 def process_images(im_list: List, img_process_func) -> List:
@@ -35,6 +56,27 @@ def process_tartan_img(msg) -> Image:
     img = Image.fromarray(img)
     return img
 
+
+def process_lidar(msg) -> PointCloud:
+    """
+    Process LiDAR data from a topic that publishes sensor_msgs/PointCloud2 to a PointCloud object.
+    This function will convert the PointCloud2 message to a PointCloud object and return it.
+
+    Args:
+        msg (sensor_msgs/PointCloud2): The ROS PointCloud2 message
+
+    Returns:
+        pcl.PointCloud: The processed PointCloud object
+    """
+    # Convert PointCloud2 message to numpy array
+    pc_data = pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True)
+    pc_np = np.array(list(pc_data))
+
+    # Convert to pcl.PointCloud format
+    pcl_cloud = pcl.PointCloud()
+    pcl_cloud.from_array(pc_np.astype(np.float32))
+
+    return pcl_cloud
 
 def process_locobot_img(msg) -> Image:
     """
@@ -111,34 +153,42 @@ def nav_to_xy_yaw(odom_msg, ang_offset: float) -> Tuple[List[float], float]:
 
 #######################################################################
 
-
-def get_images_and_odom(
+def get_images_lidar_and_odom(
     bag: rosbag.Bag,
     imtopics: List[str] or str,
     odomtopics: List[str] or str,
+    lidartopics: List[str] or str,  # LiDAR 数据话题
     img_process_func: Any,
     odom_process_func: Any,
+    lidar_process_func: Any,  # LiDAR 数据处理函数
     rate: float = 4.0,
     ang_offset: float = 0.0,
 ):
     """
-    Get image and odom data from a bag file
+    Get image, lidar, and odom data from a bag file
 
     Args:
         bag (rosbag.Bag): bag file
         imtopics (list[str] or str): topic name(s) for image data
         odomtopics (list[str] or str): topic name(s) for odom data
+        lidartopics (list[str] or str): topic name(s) for LiDAR data
         img_process_func (Any): function to process image data
         odom_process_func (Any): function to process odom data
+        lidar_process_func (Any): function to process lidar data
         rate (float, optional): rate to sample data. Defaults to 4.0.
         ang_offset (float, optional): angle offset to add to odom data. Defaults to 0.0.
+
     Returns:
         img_data (list): list of PIL images
         traj_data (list): list of odom data
+        lidar_data (list): list of processed lidar data
     """
-    # check if bag has both topics
+    # Check if bag has all the topics
     odomtopic = None
     imtopic = None
+    lidartopic = None
+
+    # Check image topic
     if type(imtopics) == str:
         imtopic = imtopics
     else:
@@ -146,6 +196,8 @@ def get_images_and_odom(
             if bag.get_message_count(imt) > 0:
                 imtopic = imt
                 break
+
+    # Check odom topic
     if type(odomtopics) == str:
         odomtopic = odomtopics
     else:
@@ -153,37 +205,55 @@ def get_images_and_odom(
             if bag.get_message_count(ot) > 0:
                 odomtopic = ot
                 break
-    if not (imtopic and odomtopic):
-        # bag doesn't have both topics
-        return None, None
+
+    # Check lidar topic
+    if type(lidartopics) == str:
+        lidartopic = lidartopics
+    else:
+        for lt in lidartopics:
+            if bag.get_message_count(lt) > 0:
+                lidartopic = lt
+                break
+
+    if not (imtopic and odomtopic and lidartopic):
+        # bag doesn't have all required topics
+        return None, None, None
 
     synced_imdata = []
     synced_odomdata = []
-    # get start time of bag in seconds
+    synced_lidar_data = []  # 新增：同步的LiDAR数据
     currtime = bag.get_start_time()
 
     curr_imdata = None
     curr_odomdata = None
+    curr_lidar_data = None  # 新增：LiDAR数据
 
-    for topic, msg, t in bag.read_messages(topics=[imtopic, odomtopic]):
+    for topic, msg, t in bag.read_messages(topics=[imtopic, odomtopic, lidartopic]):
         if topic == imtopic:
             curr_imdata = msg
         elif topic == odomtopic:
             curr_odomdata = msg
+        elif topic == lidartopic:
+            curr_lidar_data = msg
+        
         if (t.to_sec() - currtime) >= 1.0 / rate:
-            if curr_imdata is not None and curr_odomdata is not None:
+            if curr_imdata is not None and curr_odomdata is not None and curr_lidar_data is not None:
                 synced_imdata.append(curr_imdata)
                 synced_odomdata.append(curr_odomdata)
+                synced_lidar_data.append(curr_lidar_data)
                 currtime = t.to_sec()
 
+    # 处理数据
     img_data = process_images(synced_imdata, img_process_func)
     traj_data = process_odom(
         synced_odomdata,
         odom_process_func,
         ang_offset=ang_offset,
     )
+    lidar_data = process_lidar(synced_lidar_data, lidar_process_func)  # 新增：处理LiDAR数据
 
-    return img_data, traj_data
+    return img_data, traj_data, lidar_data
+
 
 
 def is_backwards(
