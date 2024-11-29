@@ -10,8 +10,6 @@ import rosbag
 from vint_train.process_data.process_data_utils import *
 
 
-
-
 def main(args: argparse.Namespace):
 
     # load the config file
@@ -44,11 +42,11 @@ def main(args: argparse.Namespace):
         traj_name = "_".join(bag_path.split("/")[-2:])[:-4]
 
         # load the hdf5 file
-        bag_img_data, bag_traj_data, bag_lidar_data = get_images_odom_and_lidar(
+        bag_img_data, bag_traj_data, bag_lidar_data = get_images_lidar_and_odom(
             b,
             config[args.dataset_name]["imtopics"],
             config[args.dataset_name]["odomtopics"],
-            config[args.dataset_name]["lidartopics"],  # 假设你在配置文件中有设置LiDAR话题
+            config[args.dataset_name]["lidartopics"],  
             eval(config[args.dataset_name]["img_process_func"]),
             eval(config[args.dataset_name]["odom_process_func"]),
             eval(config[args.dataset_name]["lidar_process_func"]),
@@ -80,7 +78,7 @@ def main(args: argparse.Namespace):
                 img.save(os.path.join(traj_folder_i, f"{i}.jpg"))
 
             # save LiDAR data as PLY
-            lidar_pcd_filename = os.path.join(traj_folder_i, "lidar_points.ply")
+            lidar_pcd_filename = os.path.join(traj_folder_i, f"{i}.ply")
             save_point_cloud_to_ply(lidar_data_i, lidar_pcd_filename)
 
 

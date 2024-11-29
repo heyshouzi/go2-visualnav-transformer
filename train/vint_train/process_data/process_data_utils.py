@@ -155,9 +155,9 @@ def nav_to_xy_yaw(odom_msg, ang_offset: float) -> Tuple[List[float], float]:
 
 def get_images_lidar_and_odom(
     bag: rosbag.Bag,
-    imtopics: List[str] or str,
-    odomtopics: List[str] or str,
-    lidartopics: List[str] or str,  # LiDAR 数据话题
+    imtopics: List[str],
+    odomtopics: List[str],
+    lidartopics: List[str],  # LiDAR 数据话题
     img_process_func: Any,
     odom_process_func: Any,
     lidar_process_func: Any,  # LiDAR 数据处理函数
@@ -273,15 +273,16 @@ def is_backwards(
 def filter_backwards(
     img_list: List[Image.Image],
     traj_data: Dict[str, np.ndarray],
+    lidar_data: List[pcl.PointCloud],
     start_slack: int = 0,
     end_slack: int = 0,
 ) -> Tuple[List[np.ndarray], List[int]]:
     """
-    Cut out non-positive velocity segments of the trajectory
+    Cut out non-positive velocity segments of the trajectory and include corresponding LiDAR data
     Args:
-        traj_type: type of trajectory to cut
         img_list: list of images
         traj_data: dictionary of position and yaw data
+        lidar_data: list of processed lidar data
         start_slack: number of points to ignore at the start of the trajectory
         end_slack: number of points to ignore at the end of the trajectory
     Returns:
@@ -293,12 +294,12 @@ def filter_backwards(
     cut_trajs = []
     start = True
 
-    def process_pair(traj_pair: list) -> Tuple[List, Dict]:
-        new_img_list, new_traj_data = zip(*traj_pair)
+    def process_pair(traj_pair: list) -> Tuple[List, Dict, List]:
+        new_img_list, new_traj_data, new_lidar_data = zip(*traj_pair)
         new_traj_data = np.array(new_traj_data)
         new_traj_pos = new_traj_data[:, :2]
         new_traj_yaws = new_traj_data[:, 2]
-        return (new_img_list, {"position": new_traj_pos, "yaw": new_traj_yaws})
+        return (new_img_list, {"position": new_traj_pos, "yaw": new_traj_yaws}, list(new_lidar_data))
 
     for i in range(max(start_slack, 1), len(traj_pos) - end_slack):
         pos1 = traj_pos[i - 1]
@@ -307,14 +308,14 @@ def filter_backwards(
         if not is_backwards(pos1, yaw1, pos2):
             if start:
                 new_traj_pairs = [
-                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]])
+                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]], lidar_data[i - 1])
                 ]
                 start = False
             elif i == len(traj_pos) - end_slack - 1:
                 cut_trajs.append(process_pair(new_traj_pairs))
             else:
                 new_traj_pairs.append(
-                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]])
+                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]], lidar_data[i - 1])
                 )
         elif not start:
             cut_trajs.append(process_pair(new_traj_pairs))
