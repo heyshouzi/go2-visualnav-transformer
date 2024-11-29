@@ -8,7 +8,7 @@ import rospy
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import Joy
 
-IMAGE_TOPIC = "/usb_cam/image_raw"
+IMAGE_TOPIC = "/robot/front_camera/image_raw"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 obs_img = None
 
@@ -27,7 +27,7 @@ def remove_files_in_dir(dir_path: str):
 
 def callback_obs(msg: Image):
     global obs_img
-
+    # print(f"callback_obs doing")
     obs_img = msg_to_pil(msg)
 
 

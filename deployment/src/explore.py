@@ -24,11 +24,14 @@ import argparse
 import yaml
 import time
 
+from vint_train.visualizing.action_utils import plot_trajs_and_points
 
 # UTILS
 from topic_names import (IMAGE_TOPIC,
                         WAYPOINT_TOPIC,
-                        SAMPLED_ACTIONS_TOPIC)
+                        SAMPLED_ACTIONS_TOPIC,
+                        PRED_PATH_TOPIC
+                        )
 
 
 # CONSTANTS
@@ -48,6 +51,37 @@ context_size = None
 # Load the model 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
+
+# 使用 plot_trajs_and_points 绘制轨迹
+def plot_naction_trajectory(naction, ax):
+    list_trajs = []
+    list_points = []
+    traj_colors = []
+    traj_labels = []
+    
+    # 遍历所有样本，添加轨迹
+    for i in range(naction.shape[0]):  # num_samples
+        list_trajs.append(naction[i])  # 轨迹
+        list_points.append(naction[i][0])  # 起点
+        if i == 0:
+            traj_colors.append('cyan')  # 第一条轨迹的颜色
+            traj_labels.append('predicted')  # 第一条轨迹标签
+        else:
+            traj_colors.append('magenta')  # 其他轨迹的颜色
+            traj_labels.append(f'sample {i}')  # 其他轨迹标签
+
+    # 绘制轨迹
+    plot_trajs_and_points(
+        ax=ax,
+        list_trajs=list_trajs,  # 所有轨迹
+        list_points=list_points,  # 所有起点
+        traj_colors=traj_colors,  # 轨迹颜色
+        point_colors=['red'] * len(list_points),  # 所有点颜色（起点）
+        traj_labels=traj_labels,  # 轨迹标签
+        point_labels=['start'] * len(list_points),  # 所有点标签
+    )
+
+
 
 def callback_obs(msg):
     obs_img = msg_to_pil(msg)
@@ -155,20 +189,23 @@ def main(args: argparse.Namespace):
                 print("time elapsed:", time.time() - start_time)
 
             naction = to_numpy(get_action(naction))
-            
+
+
+
             sampled_actions_msg = Float32MultiArray()
             sampled_actions_msg.data = np.concatenate((np.array([0]), naction.flatten()))
             sampled_actions_pub.publish(sampled_actions_msg)
-
+            print(f"before naction size:{naction.shape}")
             naction = naction[0] # change this based on heuristic
-
+            print(f"naction size:{naction.shape}")
+            print(f"naction:{naction}")
             chosen_waypoint = naction[args.waypoint]
-
+            print(f"chosen_waypoint:{chosen_waypoint}")
             if model_params["normalize"]:
                 chosen_waypoint *= (MAX_V / RATE)
             waypoint_msg.data = chosen_waypoint
             waypoint_pub.publish(waypoint_msg)
-            print("Published waypoint")
+            print(f"Published waypoint:{waypoint_msg.data}")
         rate.sleep()
 
 

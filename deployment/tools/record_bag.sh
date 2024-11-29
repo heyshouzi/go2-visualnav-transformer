@@ -10,20 +10,19 @@ tmux splitw -v -p 50 # split it into two halves
 tmux selectp -t 0    # go back to the first pane
 tmux splitw -h -p 50 # split it into two halves
 
-# Run the publisher video_stream in the first pane
+# Run the roslaunch command in the first pane
 tmux select-pane -t 0
 tmux send-keys "2" Enter
-tmux send-keys "python video_stream_publisher.py" Enter
+tmux send-keys "python ../src/video_stream_publisher.py" Enter
 
-Run the teleop.py script in the second pane
 tmux select-pane -t 1
 tmux send-keys "2" Enter
-tmux send-keys "roscore" Enter
+tmux send-keys "python pub_robot_odom.py" Enter
 n  
 # Change the directory to ../topomaps/bags and run the rosbag record command in the third pane
 tmux select-pane -t 2
 tmux send-keys "2" Enter
-tmux send-keys "cd ../topomaps/bags" Enter
-tmux send-keys "rosbag record /robot/front_camera/image_raw -O $1" # change topic if necessary
+tmux send-keys "cd ../../go2_bags" Enter
+tmux send-keys "rosbag record --lz4 /robot_odom /robot/front_camera/image_raw -O $1" # change topic if necessary
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name

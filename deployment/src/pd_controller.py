@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import yaml
 from typing import Tuple
@@ -77,6 +78,25 @@ def callback_reached_goal(reached_goal_msg: Bool):
 
 def main():
 	global vel_msg, reverse_mode
+
+	parser = argparse.ArgumentParser(description="PD Controller for robot")
+	parser.add_argument("--goal",
+					"-g",
+					 type=str,help="(x,y) coordinate of the waypoint e.g.'(2,0)'")
+	args  = parser.parse_args()
+	if args.goal:
+		try:
+			waypoint_input =np.array(eval(args.goal))
+			if len(waypoint_input) != 2:
+				raise ValueError("Goal must be a 2D vector")
+			
+			v,w = pd_controller(waypoint_input)
+			print(f"PD controller output: v:{v},w:{w}")
+		except (SyntaxError,ValueError) as e:
+			print(f"Invalid goal format:{e}")
+			return
+	
+
 	rospy.init_node("PD_CONTROLLER", anonymous=False)
 	waypoint_sub = rospy.Subscriber(WAYPOINT_TOPIC, Float32MultiArray, callback_drive, queue_size=1)
 	reached_goal_sub = rospy.Subscriber(REACHED_GOAL_TOPIC, Bool, callback_reached_goal, queue_size=1)

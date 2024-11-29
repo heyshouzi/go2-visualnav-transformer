@@ -1,7 +1,8 @@
-name: vint_deployment
+name: nomad
 channels:
 - pytorch
 - conda-forge
+- nvidia
 dependencies:
 - python=3.8.5
 - cudatoolkit=11.

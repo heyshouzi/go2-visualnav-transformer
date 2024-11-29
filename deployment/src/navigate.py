@@ -256,7 +256,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir",
         "-d",
-        default="topomap",
+        default="road",
         type=str,
         help="path to topomap images",
     )

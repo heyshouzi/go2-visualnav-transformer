@@ -234,7 +234,7 @@ This section discusses a simple way to create a topological map of the target en
 
 Run this command to video stream from go2 camera and to record the video stream information via rosbag. This command opens up two windows 
 1. `python video_stream_publisher.py`: This is the video stream from the go2 camera.
-2. `rosbag record <your_image_topic> -o <bag_name>`: This command isn’t run immediately (you have to click Enter). It will be run in the vint_release/deployment/topomaps/bags directory, where we recommend you store your rosbags.
+2. `rosbag record /robot/front_camera/image_raw  -o <bag_name>`: This command isn’t run immediately (you have to click Enter). It will be run in the vint_release/deployment/topomaps/bags directory, where we recommend you store your rosbags.
 
 Once you are ready to record the bag, run the `rosbag record` script and teleoperate the robot on the map you want the robot to follow. When you are finished with recording the path, kill the `rosbag record` command, and then kill the tmux session.
 
@@ -246,7 +246,7 @@ Once you are ready to record the bag, run the `rosbag record` script and teleope
 This command opens up 3 windows:
 1. `roscore`
 2. `python create_topomap.py —dt 1 —dir <topomap_dir>`: This command creates a directory in `/vint_release/deployment/topomaps/images` and saves an image as a node in the map every second the bag is played.
-3. `rosbag play -r 1.5 <bag_filename>`: This command plays the rosbag at x5 speed, so the python script is actually recording nodes 1.5 seconds apart. The `<bag_filename>` should be the entire bag name with the .bag extension. You can change this value in the `make_topomap.sh` file. The command does not run until you hit Enter, which you should only do once the python script gives its waiting message. Once you play the bag, move to the screen where the python script is running so you can kill it when the rosbag stops playing.
+3. `rosbag play -r 1.5 <bag_ddfilename>`: This command plays the rosbag at x5 speed, so the python script is actually recording nodes 1.5 seconds apart. The `<bag_filename>` should be the entire bag name with the .bag extension. You can change this value in the `make_topomap.sh` file. The command does not run until you hit Enter, which you should only do once the python script gives its waiting message. Once you play the bag, move to the screen where the python script is running so you can kill it when the rosbag stops playing.
 
 When the bag stops playing, kill the tmux session.
 
