@@ -27,6 +27,8 @@ dependencies:
   - lmdb 
   - vit-pytorch
   - positional-encodings
+  - einops
+  - open3d
 
 
 
