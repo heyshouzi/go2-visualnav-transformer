@@ -82,9 +82,9 @@ class ThreeDNomad(nn.Module):
         self,
         obs_img: torch.Tensor,
         goal_img: torch.Tensor,
-        lidar_points: torch.Tensor,  #lidar_points 输入
-        lidar_data: Optional[torch.Tensor] = None,  # 可选的LiDAR数据
-        lidar_mask: Optional[torch.Tensor] = None,  # 掩码来选择LiDAR输入
+        obs_lidar: torch.Tensor,  
+        goal_lidar: torch.Tensor,
+        lidar_mask: torch.Tensor = None,  # mask to choose which obs_lidar and goal_lidar data to use 
         input_goal_mask: torch.Tensor = None
     ) -> torch.Tensor:
         device = obs_img.device
@@ -125,17 +125,27 @@ class ThreeDNomad(nn.Module):
         obs_encoding = torch.cat((obs_encoding, goal_encoding), dim=1)
 
         # LiDAR编码
-        lidar_encoding = self.lidar_encoder(lidar_points)  # 处理 LiDAR 数据
-
+        if lidar_mask is not None and lidar_mask.item() == 1:
+            obs_lidar = torch.zeros_like(obs_lidar)
+            goal_lidar = torch.zeros_like(goal_lidar)
+        obs_lidar_encoding = self.lidar_encoder(obs_lidar)  # 处理 LiDAR 数据
+        goal_lidar_encoding = self.lidar_encoder(goal_lidar)  # 处理目标 LiDAR 数据
         # 合并视觉信息与 LiDAR 信息
-        combined_encoding = torch.cat((obs_encoding, lidar_encoding), dim=1)
-
+        combined_encoding = torch.cat((obs_encoding, obs_lidar_encoding,goal_lidar_encoding.unsqueeze(1)), dim=1)
         # 位置编码
         if self.positional_encoding:
             combined_encoding = self.positional_encoding(combined_encoding)
 
         # 自注意力处理
         obs_encoding_tokens = self.sa_encoder(combined_encoding)
+
+        
+        self.goal_mask = torch.zeros((1, self.context_size + 2), dtype=torch.bool)
+        self.goal_mask[:, -1] = True # Mask out the goal 
+        self.no_mask = torch.zeros((1, self.context_size + 2), dtype=torch.bool) 
+        self.all_masks = torch.cat([self.no_mask, self.goal_mask], dim=0)
+        self.avg_pool_mask = torch.cat([1 - self.no_mask.float(), (1 - self.goal_mask.float()) * ((self.context_size + 2)/(self.context_size + 1))], dim=0)
+
 
         if input_goal_mask is not None:
             avg_mask = torch.index_select(self.avg_pool_mask.to(device), 0, goal_mask.long()).unsqueeze(-1)
