@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import tqdm
 import io
 import lmdb
-
+from plyfile import PlyData
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.functional as TF
@@ -126,19 +126,28 @@ class ViNT_Dataset(Dataset):
     def __getstate__(self):
         state = self.__dict__.copy()
         state["_image_cache"] = None
+        state["_lidar_cache"] = None
         return state
     
     def __setstate__(self, state):
         self.__dict__ = state
         self._build_caches()
 
+
     def _build_caches(self, use_tqdm: bool = True):
         """
-        Build a cache of images for faster loading using LMDB
+        Build caches of images and LiDAR data for faster loading using LMDB
         """
-        cache_filename = os.path.join(
+        # Cache filename for images
+        image_cache_filename = os.path.join(
             self.data_split_folder,
-            f"dataset_{self.dataset_name}.lmdb",
+            f"dataset_{self.dataset_name}_images.lmdb",
+        )
+
+        # Cache filename for LiDAR data
+        lidar_cache_filename = os.path.join(
+            self.data_split_folder,
+            f"dataset_{self.dataset_name}_lidar.lmdb",
         )
 
         # Load all the trajectories into memory. These should already be loaded, but just in case.
@@ -146,25 +155,44 @@ class ViNT_Dataset(Dataset):
             self._get_trajectory(traj_name)
 
         """
-        If the cache file doesn't exist, create it by iterating through the dataset and writing each image to the cache
+        If the image cache file doesn't exist, create it by iterating through the dataset and writing each image to the cache
         """
-        if not os.path.exists(cache_filename):
+        if not os.path.exists(image_cache_filename):
             tqdm_iterator = tqdm.tqdm(
                 self.goals_index,
                 disable=not use_tqdm,
                 dynamic_ncols=True,
-                desc=f"Building LMDB cache for {self.dataset_name}"
+                desc=f"Building LMDB cache for {self.dataset_name} images"
             )
-            with lmdb.open(cache_filename, map_size=2**40) as image_cache:
+            with lmdb.open(image_cache_filename, map_size=2**40) as image_cache:
                 with image_cache.begin(write=True) as txn:
                     for traj_name, time in tqdm_iterator:
-                        image_path = get_data_path(self.data_folder, traj_name, time)
+                        image_path = get_data_path(self.data_folder, traj_name, time,"image")
                         with open(image_path, "rb") as f:
                             txn.put(image_path.encode(), f.read())
 
-        # Reopen the cache file in read-only mode
-        self._image_cache: lmdb.Environment = lmdb.open(cache_filename, readonly=True)
+        """
+        If the LiDAR cache file doesn't exist, create it by iterating through the dataset and writing each LiDAR data to the cache
+        """
+        if not os.path.exists(lidar_cache_filename):
+            tqdm_iterator = tqdm.tqdm(
+                self.goals_index,
+                disable=not use_tqdm,
+                dynamic_ncols=True,
+                desc=f"Building LMDB cache for {self.dataset_name} LiDAR data"
+            )
+            with lmdb.open(lidar_cache_filename, map_size=2**40) as lidar_cache:
+                with lidar_cache.begin(write=True) as txn:
+                    for traj_name, time in tqdm_iterator:
+                        lidar_path = get_data_path(self.data_folder, traj_name, time,"lidar")  
+                        with open(lidar_path, "rb") as f:
+                            txn.put(lidar_path.encode(), f.read())
 
+        # Reopen the cache files in read-only mode
+        self._image_cache = lmdb.open(image_cache_filename, readonly=True)
+        self._lidar_cache = lmdb.open(lidar_cache_filename, readonly=True)
+
+        
     def _build_index(self, use_tqdm: bool = False):
         """
         Build an index consisting of tuples (trajectory name, time, max goal distance)
@@ -198,7 +226,7 @@ class ViNT_Dataset(Dataset):
             return trajectory_name, goal_time, True
         else:
             goal_time = curr_time + int(goal_offset * self.waypoint_spacing)
-            return trajectory_name, goal_time, False
+            return trajectory_name, goal_time, False 
 
     def _sample_negative(self):
         """
@@ -224,8 +252,29 @@ class ViNT_Dataset(Dataset):
             with open(index_to_data_path, "wb") as f:
                 pickle.dump((self.index_to_data, self.goals_index), f)
 
+    def _load_lidar(self, trajectory_name, time):
+        lidar_path = get_data_path(self.data_folder, trajectory_name, time, 'lidar')
+        try:
+            with open(lidar_path, 'rb') as f:
+                plydata = PlyData.read(f)
+            
+            # Extract x, y, z coordinates
+            x = np.array(plydata['vertex']['x'], dtype=np.float32)
+            y = np.array(plydata['vertex']['y'], dtype=np.float32)
+            z = np.array(plydata['vertex']['z'], dtype=np.float32)
+            
+            # Stack them into a single array of shape [N, 3]
+            lidar_data = np.stack([x, y, z], axis=-1)
+            
+            # Convert to torch.Tensor
+            lidar_tensor = torch.tensor(lidar_data, dtype=torch.float32)
+            return lidar_tensor
+        except Exception as e:
+            print(f"Failed to load lidar data {lidar_path}: {e}")
+            return None
+
     def _load_image(self, trajectory_name, time):
-        image_path = get_data_path(self.data_folder, trajectory_name, time)
+        image_path = get_data_path(self.data_folder, trajectory_name, time,'image')
 
         try:
             with self._image_cache.begin() as txn:
@@ -291,8 +340,10 @@ class ViNT_Dataset(Dataset):
             i (int): index to ith datapoint
         Returns:
             Tuple of tensors containing the context, observation, goal, transformed context, transformed observation, transformed goal, distance label, and action label
-                obs_image (torch.Tensor): tensor of shape [3, H, W] containing the image of the robot's observation
+                obs_image (torch.Tensor): tensor of shape [3 * context_size, H, W] containing the image of the robot's observation
                 goal_image (torch.Tensor): tensor of shape [3, H, W] containing the subgoal image 
+                obs_lidar (torch.Tensor): tensor of shape [context_size,N, 3] containing the lidar data of the robot's observation
+                goal_lidar (torch.Tensor): tensor of shape [N, 3] containing the lidar data of the subgoal
                 dist_label (torch.Tensor): tensor of shape (1,) containing the distance labels from the observation to the goal
                 action_label (torch.Tensor): tensor of shape (5, 2) or (5, 4) (if training with angle) containing the action labels from the observation to the goal
                 which_dataset (torch.Tensor): index of the datapoint in the dataset [for identifying the dataset for visualization when using multiple datasets]
@@ -316,16 +367,19 @@ class ViNT_Dataset(Dataset):
             raise ValueError(f"Invalid context type {self.context_type}")
 
         obs_image = torch.cat([
-            self._load_image(f, t) for f, t in context
-        ])
+            self._load_image(f, t) for f, t in context])  
+
+        obs_lidar = torch.stack([
+            self._load_lidar(f, t) for f, t in context])
+
 
         # Load goal image
         goal_image = self._load_image(f_goal, goal_time)
-
+        goal_lidar = self._load_lidar(f_goal, goal_time)
         # Load other trajectory data
         curr_traj_data = self._get_trajectory(f_curr)
         curr_traj_len = len(curr_traj_data["position"])
-        assert curr_time < curr_traj_len, f"{curr_time} and {curr_traj_len}"
+        assert curr_time < curr_traj_len, f"{curr_time} and {curr_traj_len}"  
 
         goal_traj_data = self._get_trajectory(f_goal)
         goal_traj_len = len(goal_traj_data["position"])
@@ -354,6 +408,8 @@ class ViNT_Dataset(Dataset):
         return (
             torch.as_tensor(obs_image, dtype=torch.float32),
             torch.as_tensor(goal_image, dtype=torch.float32),
+            torch.as_tensor(obs_lidar, dtype=torch.float32),
+            torch.as_tensor(goal_lidar, dtype=torch.float32),
             actions_torch,
             torch.as_tensor(distance, dtype=torch.int64),
             torch.as_tensor(goal_pos, dtype=torch.float32),

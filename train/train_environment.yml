@@ -29,6 +29,7 @@ dependencies:
   - positional-encodings
   - einops
   - open3d
+  - plyfile
 
 
 
