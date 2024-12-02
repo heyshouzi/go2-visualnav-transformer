@@ -1,7 +1,5 @@
 import os
 import pickle
-from PIL import Image
-import io
 import argparse
 import tqdm
 import yaml
