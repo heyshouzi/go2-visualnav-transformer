@@ -20,6 +20,7 @@ IMAGE_ASPECT_RATIO = (
 def get_data_path(data_folder: str, f: str, time: int, data_type: str = "image"):
     data_ext = {
         "image": ".jpg",
+        "lidar": ".p",
         # add more data types here
     }
     return os.path.join(data_folder, f, f"{str(time)}{data_ext[data_type]}")
