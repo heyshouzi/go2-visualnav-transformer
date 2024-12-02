@@ -274,7 +274,6 @@ def filter_backwards(
     img_list: List[Image.Image],
     lidar_data: List[pcl.PointCloud],
     traj_data: Dict[str, np.ndarray],
-    lidar_data: List[pcl.PointCloud],
     start_slack: int = 0,
     end_slack: int = 0,
 ) -> Tuple[List[np.ndarray], List[int]]:
