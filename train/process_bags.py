@@ -6,7 +6,6 @@ import argparse
 import tqdm
 import yaml
 import rosbag
-
 from vint_train.process_data.process_data_utils import *
 
 
@@ -42,14 +41,14 @@ def main(args: argparse.Namespace):
         traj_name = "_".join(bag_path.split("/")[-2:])[:-4]
 
         # load the hdf5 file
-        bag_img_data, bag_traj_data, bag_lidar_data = get_images_lidar_and_odom(
+        bag_img_data, bag_lidar_data, bag_traj_data = get_images_lidar_and_odom(
             b,
             config[args.dataset_name]["imtopics"],
+            config[args.dataset_name]["lidartopics"], 
             config[args.dataset_name]["odomtopics"],
-            config[args.dataset_name]["lidartopics"],  
             eval(config[args.dataset_name]["img_process_func"]),
-            eval(config[args.dataset_name]["odom_process_func"]),
             eval(config[args.dataset_name]["lidar_process_func"]),
+            eval(config[args.dataset_name]["odom_process_func"]),
             rate=args.sample_rate,
             ang_offset=config[args.dataset_name]["ang_offset"],
         )
@@ -60,9 +59,9 @@ def main(args: argparse.Namespace):
             )
             continue
         # remove backwards movement
-        cut_trajs = filter_backwards(bag_img_data, bag_traj_data)
+        cut_trajs = filter_backwards(bag_img_data, bag_lidar_data, bag_traj_data)
 
-        for i, (img_data_i, traj_data_i, lidar_data_i) in enumerate(cut_trajs):
+        for i, (img_data_i, lidar_data_i, traj_data_i) in enumerate(cut_trajs):
             traj_name_i = traj_name + f"_{i}"
             traj_folder_i = os.path.join(args.output_dir, traj_name_i)
             # make a folder for the traj

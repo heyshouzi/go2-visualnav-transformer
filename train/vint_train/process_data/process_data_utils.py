@@ -19,8 +19,8 @@ IMAGE_ASPECT_RATIO = 4 / 3
 def save_point_cloud_to_ply(point_cloud, output_path):
     """
     将点云保存为PLY格式
-    :param point_cloud: 一个(N, 3)的numpy数组，包含点云坐标
-    :param output_path: 输出路径，保存为PLY文件
+    :param point_cloud: 一个(N, 3)的numpy数组 包含点云坐标
+    :param output_path: 输出路径 保存为PLY文件
     """
     # 创建一个open3d点云对象
     pcd = o3d.geometry.PointCloud()
@@ -155,12 +155,12 @@ def nav_to_xy_yaw(odom_msg, ang_offset: float) -> Tuple[List[float], float]:
 
 def get_images_lidar_and_odom(
     bag: rosbag.Bag,
-    imtopics: List[str],
-    odomtopics: List[str],
-    lidartopics: List[str],  # LiDAR 数据话题
+    imtopics: List[str] or str,
+    lidartopics: List[str] or str,  
+    odomtopics: List[str] or str,
     img_process_func: Any,
+    lidar_process_func: Any, 
     odom_process_func: Any,
-    lidar_process_func: Any,  # LiDAR 数据处理函数
     rate: float = 4.0,
     ang_offset: float = 0.0,
 ):
@@ -170,18 +170,19 @@ def get_images_lidar_and_odom(
     Args:
         bag (rosbag.Bag): bag file
         imtopics (list[str] or str): topic name(s) for image data
-        odomtopics (list[str] or str): topic name(s) for odom data
         lidartopics (list[str] or str): topic name(s) for LiDAR data
+        odomtopics (list[str] or str): topic name(s) for odom data
         img_process_func (Any): function to process image data
-        odom_process_func (Any): function to process odom data
         lidar_process_func (Any): function to process lidar data
+        odom_process_func (Any): function to process odom data
         rate (float, optional): rate to sample data. Defaults to 4.0.
         ang_offset (float, optional): angle offset to add to odom data. Defaults to 0.0.
 
     Returns:
         img_data (list): list of PIL images
-        traj_data (list): list of odom data
         lidar_data (list): list of processed lidar data
+        traj_data (list): list of odom data
+       
     """
     # Check if bag has all the topics
     odomtopic = None
@@ -221,12 +222,12 @@ def get_images_lidar_and_odom(
 
     synced_imdata = []
     synced_odomdata = []
-    synced_lidar_data = []  # 新增：同步的LiDAR数据
+    synced_lidar_data = []  
     currtime = bag.get_start_time()
 
     curr_imdata = None
     curr_odomdata = None
-    curr_lidar_data = None  # 新增：LiDAR数据
+    curr_lidar_data = None  
 
     for topic, msg, t in bag.read_messages(topics=[imtopic, odomtopic, lidartopic]):
         if topic == imtopic:
@@ -250,9 +251,8 @@ def get_images_lidar_and_odom(
         odom_process_func,
         ang_offset=ang_offset,
     )
-    lidar_data = process_lidar(synced_lidar_data, lidar_process_func)  # 新增：处理LiDAR数据
-
-    return img_data, traj_data, lidar_data
+    lidar_data = process_lidar(synced_lidar_data, lidar_process_func)  
+    return img_data, lidar_data, traj_data
 
 
 
@@ -272,6 +272,7 @@ def is_backwards(
 # cut out non-positive velocity segments of the trajectory
 def filter_backwards(
     img_list: List[Image.Image],
+    lidar_data: List[pcl.PointCloud],
     traj_data: Dict[str, np.ndarray],
     lidar_data: List[pcl.PointCloud],
     start_slack: int = 0,
@@ -294,12 +295,12 @@ def filter_backwards(
     cut_trajs = []
     start = True
 
-    def process_pair(traj_pair: list) -> Tuple[List, Dict, List]:
-        new_img_list, new_traj_data, new_lidar_data = zip(*traj_pair)
+    def process_pair(traj_pair: list) -> Tuple[List,List,Dict]:
+        new_img_list, new_lidar_list,new_traj_data = zip(*traj_pair)
         new_traj_data = np.array(new_traj_data)
         new_traj_pos = new_traj_data[:, :2]
         new_traj_yaws = new_traj_data[:, 2]
-        return (new_img_list, {"position": new_traj_pos, "yaw": new_traj_yaws}, list(new_lidar_data))
+        return (new_img_list,new_lidar_list, {"position": new_traj_pos, "yaw": new_traj_yaws})
 
     for i in range(max(start_slack, 1), len(traj_pos) - end_slack):
         pos1 = traj_pos[i - 1]
@@ -308,14 +309,14 @@ def filter_backwards(
         if not is_backwards(pos1, yaw1, pos2):
             if start:
                 new_traj_pairs = [
-                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]], lidar_data[i - 1])
+                    (img_list[i - 1], lidar_data[i - 1],[*traj_pos[i - 1], traj_yaws[i - 1]])
                 ]
                 start = False
             elif i == len(traj_pos) - end_slack - 1:
                 cut_trajs.append(process_pair(new_traj_pairs))
             else:
                 new_traj_pairs.append(
-                    (img_list[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]], lidar_data[i - 1])
+                    (img_list[i - 1], lidar_data[i - 1], [*traj_pos[i - 1], traj_yaws[i - 1]])
                 )
         elif not start:
             cut_trajs.append(process_pair(new_traj_pairs))
