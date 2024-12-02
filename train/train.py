@@ -27,6 +27,7 @@ from vint_train.models.gnm.gnm import GNM
 from vint_train.models.vint.vint import ViNT
 from vint_train.models.vint.vit import ViT
 from vint_train.models.nomad.nomad import NoMaD, DenseNetwork
+from vint_train.models.nomad3d.nomad3d import ThreeDNoMaD
 from vint_train.models.nomad.nomad_vint import NoMaD_ViNT, replace_bn_with_gn
 from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
 
@@ -219,6 +220,17 @@ def main(config):
             beta_schedule='squaredcos_cap_v2',
             clip_sample=True,
             prediction_type='epsilon'
+        )
+    elif config["model_type"] == "3d-nomad":
+        model = ThreeDNoMaD(
+            context_size=config["context_size"],
+            obs_encoder=config["obs_encoder"],
+            obs_encoding_size=config["obs_encoding_size"],
+            mha_num_attention_heads=config["mha_num_attention_heads"],
+            mha_num_attention_layers=config["mha_num_attention_layers"],
+            mha_ff_dim_factor=config["mha_ff_dim_factor"],
+            lidar_encoder=config["lidar_encoder"],
+            lidar_encoding_size=config["lidar_encoding_size"]
         )
     else:
         raise ValueError(f"Model {config['model']} not supported")

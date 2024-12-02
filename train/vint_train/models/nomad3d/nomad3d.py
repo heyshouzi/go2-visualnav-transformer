@@ -7,21 +7,11 @@ from pointnet import PointNet  # 假设 PointNet 类已经定义并可以导入
 from typing import List, Dict, Optional, Tuple, Callable
 from efficientnet_pytorch import EfficientNet
 from vint_train.models.vint.self_attention import PositionalEncoding
+from lidar_encoder import dp3Net,PointNet,PointNetplusplus,PointTransformer
 
 
-class LiDAREncoder(nn.Module):
-    def __init__(self, input_channels: int = 3, encoding_size: int = 128):
-        super(LiDAREncoder, self).__init__()
-        # 假设 PointNet 网络已经定义好
-        self.pointnet = PointNet(input_channels=input_channels, output_channels=encoding_size)
-        self.encoding_size = encoding_size
 
-    def forward(self, lidar_points: torch.Tensor) -> torch.Tensor:
-        # lidar_points 的形状是 [batch_size, num_points, 3]，这里假设输入是 [batch_size, num_points, 3]
-        return self.pointnet(lidar_points)
-
-
-class ThreeDNomad(nn.Module):
+class ThreeDNoMaD(nn.Module):
     def __init__(
         self,
         context_size: int = 5,
@@ -30,8 +20,8 @@ class ThreeDNomad(nn.Module):
         mha_num_attention_heads: Optional[int] = 2,
         mha_num_attention_layers: Optional[int] = 2,
         mha_ff_dim_factor: Optional[int] = 4,
-        lidar_encoding_size: Optional[int] = 512,  # 新增 LiDAR 编码大小
-        lidar_encoder: Optional[nn.Module] = None, 
+        lidar_encoding_size: Optional[int] = 512,  
+        lidar_encoder: Optional[str] = "dp3net", 
     ) -> None:
         super().__init__()
         self.obs_encoding_size = obs_encoding_size
@@ -45,7 +35,7 @@ class ThreeDNomad(nn.Module):
             self.num_obs_features = self.obs_encoder._fc.in_features
             self.obs_encoder_type = "efficientnet"
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"unknown obs_encoder: {obs_encoder}")
 
         # 目标信息编码器
         self.goal_encoder = EfficientNet.from_name("efficientnet-b0", in_channels=6)
@@ -53,7 +43,17 @@ class ThreeDNomad(nn.Module):
         self.num_goal_features = self.goal_encoder._fc.in_features
 
         # LiDAR 编码器
-        self.lidar_encoder = LiDAREncoder(input_channels=3, encoding_size=lidar_encoding_size)
+        if lidar_encoder == "dp3net":
+            self.lidar_encoder = dp3Net(input_channels=3, output_channels=lidar_encoding_size)
+        elif lidar_encoder == "pointnet":
+            self.lidar_encoder = PointNet(input_channels=3, output_channels=lidar_encoding_size)
+        elif lidar_encoder == "pointnet++":
+            self.lidar_encoder = PointNetplusplus(input_channels=3, output_channels=lidar_encoding_size)
+        elif lidar_encoder == "point-transformer":
+            self.lidar_encoder = PointTransformer(input_channels=3, output_channels=lidar_encoding_size)
+        else:
+            raise NotImplementedError(f"unknown lidar_encoder: {lidar_encoder}")
+
 
         # 编码器压缩层
         if self.num_obs_features != self.obs_encoding_size:
