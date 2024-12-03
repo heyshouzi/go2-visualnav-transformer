@@ -4,13 +4,12 @@ import argparse
 import tqdm
 import yaml
 import rosbag
-from vint_train.process_data.process_data_utils import *
-
+from nomad3d_train.process_data.process_data_utils import *
 
 def main(args: argparse.Namespace):
 
     # load the config file
-    with open("vint_train/process_data/process_bags_config.yaml", "r") as f:
+    with open("nomad3d_train/process_data/process_bags_config.yaml", "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     # create output dir if it doesn't exist
@@ -50,15 +49,15 @@ def main(args: argparse.Namespace):
             rate=args.sample_rate,
             ang_offset=config[args.dataset_name]["ang_offset"],
         )
-
         if bag_img_data is None or bag_traj_data is None or bag_lidar_data is None:
             print(
                 f"{bag_path} did not have the topics we were looking for. Skipping..."
             )
             continue
         # remove backwards movement
+        print(f"Loaded {len(bag_img_data)} images,{len(bag_lidar_data)} lidars")
         cut_trajs = filter_backwards(bag_img_data, bag_lidar_data, bag_traj_data)
-
+        print(f"{traj_name}: {len(cut_trajs)} trajectories")
         for i, (img_data_i, lidar_data_i, traj_data_i) in enumerate(cut_trajs):
             traj_name_i = traj_name + f"_{i}"
             traj_folder_i = os.path.join(args.output_dir, traj_name_i)
@@ -73,10 +72,9 @@ def main(args: argparse.Namespace):
             # save the image data to disk
             for i, img in enumerate(img_data_i):
                 img.save(os.path.join(traj_folder_i, f"{i}.jpg"))
+            for i, lidar in enumerate(lidar_data_i):
+                save_point_cloud_to_ply(lidar, os.path.join(traj_folder_i, f"{i}.ply"))
 
-            # save LiDAR data as PLY
-            lidar_pcd_filename = os.path.join(traj_folder_i, f"{i}.ply")
-            save_point_cloud_to_ply(lidar_data_i, lidar_pcd_filename)
 
 
 

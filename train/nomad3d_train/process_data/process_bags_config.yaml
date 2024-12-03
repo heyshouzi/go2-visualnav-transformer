@@ -27,3 +27,12 @@ sacson:
   odom_process_func: "nav_to_xy_yaw"
 
 # add your own datasets below:
+
+meadow:
+  odomtopics: "/fusion_localization"
+  lidartopics: "/lidar_points"
+  imtopics: "/camera_front/color/image_raw"
+  ang_offset: 0.0
+  img_process_func: "process_locobot_img"
+  odom_process_func: "nav_to_xy_yaw"
+  lidar_process_func: "filter_lidar"

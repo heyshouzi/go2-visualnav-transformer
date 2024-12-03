@@ -6,10 +6,8 @@ from PIL import Image
 import cv2
 from typing import Any, Tuple, List, Dict
 import open3d as o3d
-import pcl
 import sensor_msgs.point_cloud2 as pc2
 import numpy as np
-from pcl import PointCloud
 import torchvision.transforms.functional as TF
 
 IMAGE_SIZE = (160, 120)
@@ -43,6 +41,49 @@ def process_images(im_list: List, img_process_func) -> List:
     return images
 
 
+def process_lidar(lidar_list: List, lidar_process_func) -> List:
+    """
+    Process LiDAR data from a topic that publishes sensor_msgs/PointCloud2 to an Open3D PointCloud object.
+    This function will convert the list of PointCloud2 message to the list of np.ndarray and return it.
+
+    Args:
+        lidar_list (List[sensor_msgs/PointCloud2]): The list of ROS PointCloud2 message
+        lidar_process_func (Callable): Function to process each PointCloud2 message. Defaults to filter_lidar.
+
+    Returns:
+        List[np.ndarray]: The processed point cloud data as a list of numpy arrays
+    """
+    # Convert PointCloud2 message to numpy array
+    processed_lidar_list = []
+    for lidar_msg in lidar_list:
+        lidar = lidar_process_func(lidar_msg)
+        processed_lidar_list.append(lidar)
+
+    return processed_lidar_list
+
+
+def filter_lidar(msg) -> np.ndarray:
+    """
+    过滤并提取 sensor_msgs/PointCloud2 消息中的 XYZ 点云数据，返回 numpy 数组格式 (N, 3)
+
+    Args:
+        msg (sensor_msgs.PointCloud2): ROS PointCloud2 消息
+
+    Returns:
+        np.ndarray: 包含点云 XYZ 坐标的 numpy 数组，形状为 (N, 3)
+    """
+    # 提取点云数据
+    point_cloud_list = list(pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
+    
+
+    # 将点云数据转换为 numpy 数组
+    point_cloud_array = np.array(point_cloud_list, dtype=np.float32)
+    
+    # 过滤掉 x 坐标小于 0 的点
+    filtered_point_cloud_array = point_cloud_array[point_cloud_array[:, 0] >= 0]
+    
+    return filtered_point_cloud_array
+
 def process_tartan_img(msg) -> Image:
     """
     Process image data from a topic that publishes sensor_msgs/Image to a PIL image for the tartan_drive dataset
@@ -57,26 +98,6 @@ def process_tartan_img(msg) -> Image:
     return img
 
 
-def process_lidar(msg) -> PointCloud:
-    """
-    Process LiDAR data from a topic that publishes sensor_msgs/PointCloud2 to a PointCloud object.
-    This function will convert the PointCloud2 message to a PointCloud object and return it.
-
-    Args:
-        msg (sensor_msgs/PointCloud2): The ROS PointCloud2 message
-
-    Returns:
-        pcl.PointCloud: The processed PointCloud object
-    """
-    # Convert PointCloud2 message to numpy array
-    pc_data = pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True)
-    pc_np = np.array(list(pc_data))
-
-    # Convert to pcl.PointCloud format
-    pcl_cloud = pcl.PointCloud()
-    pcl_cloud.from_array(pc_np.astype(np.float32))
-
-    return pcl_cloud
 
 def process_locobot_img(msg) -> Image:
     """
@@ -251,7 +272,8 @@ def get_images_lidar_and_odom(
         odom_process_func,
         ang_offset=ang_offset,
     )
-    lidar_data = process_lidar(synced_lidar_data, lidar_process_func)  
+
+    lidar_data = process_lidar(synced_lidar_data,lidar_process_func)  
     return img_data, lidar_data, traj_data
 
 
@@ -272,11 +294,11 @@ def is_backwards(
 # cut out non-positive velocity segments of the trajectory
 def filter_backwards(
     img_list: List[Image.Image],
-    lidar_data: List[pcl.PointCloud],
+    lidar_data: List[np.ndarray],
     traj_data: Dict[str, np.ndarray],
     start_slack: int = 0,
     end_slack: int = 0,
-) -> Tuple[List[np.ndarray], List[int]]:
+) -> Tuple[List[np.ndarray],List[int]]:
     """
     Cut out non-positive velocity segments of the trajectory and include corresponding LiDAR data
     Args:
