@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+# https://arxiv.org/pdf/2403.03954
 class dp3Net(nn.Module):
     def __init__(self, input_channels, output_channels):
         super(dp3Net, self).__init__()
@@ -18,6 +20,7 @@ class dp3Net(nn.Module):
         x = F.relu(self.bn3(self.conv3(x)))
         return x
 
+# https://arxiv.org/pdf/1612.00593
 class PointNet(nn.Module):
     def __init__(self, input_channels, output_channels):
         super(PointNet, self).__init__()
