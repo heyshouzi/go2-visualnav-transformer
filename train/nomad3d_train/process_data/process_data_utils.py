@@ -63,6 +63,7 @@ def process_lidar(lidar_list: List, lidar_process_func) -> List:
 
 
 def filter_lidar(msg) -> np.ndarray:
+    # TODO：将点云数据变换到相机所在的坐标系
     """
     过滤并提取 sensor_msgs/PointCloud2 消息中的 XYZ 点云数据，返回 numpy 数组格式 (N, 3)
 
@@ -80,9 +81,9 @@ def filter_lidar(msg) -> np.ndarray:
     point_cloud_array = np.array(point_cloud_list, dtype=np.float32)
     
     # 过滤掉 x 坐标小于 0 的点
-    filtered_point_cloud_array = point_cloud_array[point_cloud_array[:, 0] >= 0]
+    # filtered_point_cloud_array = point_cloud_array[point_cloud_array[:, 0] >= 0]
     
-    return filtered_point_cloud_array
+    return point_cloud_array
 
 def process_tartan_img(msg) -> Image:
     """
