@@ -342,8 +342,8 @@ class ViNT_Dataset(Dataset):
             Tuple of tensors containing the context, observation, goal, transformed context, transformed observation, transformed goal, distance label, and action label
                 obs_image (torch.Tensor): tensor of shape [3 * context_size, H, W] containing the image of the robot's observation
                 goal_image (torch.Tensor): tensor of shape [3, H, W] containing the subgoal image 
-                obs_lidar (torch.Tensor): tensor of shape [context_size,N, 3] containing the lidar data of the robot's observation
-                goal_lidar (torch.Tensor): tensor of shape [N, 3] containing the lidar data of the subgoal
+                obs_lidar (torch.Tensor): tensor of shape [context_size, N, 3] containing the lidar data of the robot's observation
+                goal_lidar (torch.Tensor): tensor of shape [1, N, 3] containing the lidar data of the subgoal
                 dist_label (torch.Tensor): tensor of shape (1,) containing the distance labels from the observation to the goal
                 action_label (torch.Tensor): tensor of shape (5, 2) or (5, 4) (if training with angle) containing the action labels from the observation to the goal
                 which_dataset (torch.Tensor): index of the datapoint in the dataset [for identifying the dataset for visualization when using multiple datasets]
@@ -376,6 +376,7 @@ class ViNT_Dataset(Dataset):
         # Load goal image
         goal_image = self._load_image(f_goal, goal_time)
         goal_lidar = self._load_lidar(f_goal, goal_time)
+        goal_lidar = goal_lidar.unsqueeze(0)
         # Load other trajectory data
         curr_traj_data = self._get_trajectory(f_curr)
         curr_traj_len = len(curr_traj_data["position"])
