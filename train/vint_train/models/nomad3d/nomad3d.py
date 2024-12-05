@@ -27,7 +27,7 @@ class ThreeDNoMaD(nn.Module):
         self.goal_encoding_size = obs_encoding_size
         self.context_size = context_size
 
-        # 视觉信息编码器
+        # obs encoder
         if obs_encoder.split("-")[0] == "efficientnet":
             self.obs_encoder = EfficientNet.from_name(obs_encoder, in_channels=3)
             self.obs_encoder = replace_bn_with_gn(self.obs_encoder)
@@ -36,25 +36,25 @@ class ThreeDNoMaD(nn.Module):
         else:
             raise NotImplementedError(f"unknown obs_encoder: {obs_encoder}")
 
-        # 目标信息编码器
-        self.goal_encoder = EfficientNet.from_name("efficientnet-b0", in_channels=6)
+        # Initital the goal encoder
+        self.goal_encoder = EfficientNet.from_name("efficientnet-b0", in_channels=6) #obs+goal
         self.goal_encoder = replace_bn_with_gn(self.goal_encoder)
         self.num_goal_features = self.goal_encoder._fc.in_features
 
-        # LiDAR 编码器
+        # LiDAR encoder
         if lidar_encoder == "dp3net":
-            self.lidar_encoder = dp3Net(input_channels=3, output_channels=lidar_encoding_size)
+            self.lidar_encoder = dp3Net(in_channels=3, out_channels=lidar_encoding_size)
         elif lidar_encoder == "pointnet":
-            self.lidar_encoder = PointNet(input_channels=3, output_channels=lidar_encoding_size)
+            self.lidar_encoder = PointNet(in_channels=3, out_channels=lidar_encoding_size)
         elif lidar_encoder == "pointnet++":
-            self.lidar_encoder = PointNetplusplus(input_channels=3, output_channels=lidar_encoding_size)
+            self.lidar_encoder = PointNetplusplus(in_channels=3, out_channels=lidar_encoding_size)
         elif lidar_encoder == "point-transformer":
-            self.lidar_encoder = PointTransformer(input_channels=3, output_channels=lidar_encoding_size)
+            self.lidar_encoder = PointTransformer(in_channels=3, out_channels=lidar_encoding_size)
         else:
             raise NotImplementedError(f"unknown lidar_encoder: {lidar_encoder}")
 
 
-        # 编码器压缩层
+        # observation encoder
         if self.num_obs_features != self.obs_encoding_size:
             self.compress_obs_enc = nn.Linear(self.num_obs_features, self.obs_encoding_size)
         else:
@@ -65,7 +65,7 @@ class ThreeDNoMaD(nn.Module):
         else:
             self.compress_goal_enc = nn.Identity()
 
-        # 位置编码与自注意力层
+        # Positional encoding and self-attention
         self.positional_encoding = PositionalEncoding(self.obs_encoding_size, max_seq_len=self.context_size + 2)
         self.sa_layer = nn.TransformerEncoderLayer(
             d_model=self.obs_encoding_size,
@@ -88,13 +88,13 @@ class ThreeDNoMaD(nn.Module):
     ) -> torch.Tensor:
         device = obs_img.device
 
-        # 目标编码
+        # goal encoding
         goal_encoding = torch.zeros((obs_img.size()[0], 1, self.goal_encoding_size)).to(device)
 
         if input_goal_mask is not None:
             goal_mask = input_goal_mask.to(device)
 
-        # 目标图像编码
+        # goal image encoding
         obsgoal_img = torch.cat([obs_img[:, 3 * self.context_size:, :, :], goal_img], dim=1)
         obsgoal_encoding = self.goal_encoder.extract_features(obsgoal_img)
         obsgoal_encoding = self.goal_encoder._avg_pooling(obsgoal_encoding)
@@ -109,7 +109,7 @@ class ThreeDNoMaD(nn.Module):
         assert obsgoal_encoding.shape[2] == self.goal_encoding_size
         goal_encoding = obsgoal_encoding
 
-        # 获取观察图像编码
+        # obtain image encoding
         obs_img = torch.split(obs_img, 3, dim=1)
         obs_img = torch.concat(obs_img, dim=0)
         obs_encoding = self.obs_encoder.extract_features(obs_img)
@@ -123,19 +123,28 @@ class ThreeDNoMaD(nn.Module):
         obs_encoding = torch.transpose(obs_encoding, 0, 1)
         obs_encoding = torch.cat((obs_encoding, goal_encoding), dim=1)
 
-        # LiDAR编码
+        # LiDAR encoder
         if lidar_mask is not None and lidar_mask.item() == 1:
             obs_lidar = torch.zeros_like(obs_lidar)
             goal_lidar = torch.zeros_like(goal_lidar)
         obs_lidar_encoding = self.lidar_encoder(obs_lidar)  # 处理 LiDAR 数据
         goal_lidar_encoding = self.lidar_encoder(goal_lidar)  # 处理目标 LiDAR 数据
+
+        batch_size, context_size, _, _ = obs_img.shape
+        obs_lidar_encoding = obs_lidar_encoding.view(batch_size, context_size, -1)
+        obs_encoding = torch.cat((obs_encoding, obs_lidar_encoding), dim=-1)
+
+        # Fusion of goal_img and goal_lidar
+        goal_lidar_encoding = goal_lidar_encoding.view(batch_size, -1)
+        goal_encoding = torch.cat((goal_encoding, goal_lidar_encoding.unsqueeze(1)), dim=-1)
+
         # 合并视觉信息与 LiDAR 信息
-        combined_encoding = torch.cat((obs_encoding, obs_lidar_encoding,goal_lidar_encoding.unsqueeze(1)), dim=1)
-        # 位置编码
+        combined_encoding = torch.cat((obs_encoding, goal_encoding), dim=1)
+        # 
         if self.positional_encoding:
             combined_encoding = self.positional_encoding(combined_encoding)
 
-        # 自注意力处理
+        
         obs_encoding_tokens = self.sa_encoder(combined_encoding)
 
         
@@ -210,3 +219,5 @@ def replace_submodules(
         if predicate(m)]
     assert len(bn_list) == 0
     return root_module
+
+
