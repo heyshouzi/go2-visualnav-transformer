@@ -37,6 +37,7 @@ from vint_train.data.vint_dataset import ViNT_Dataset
 from vint_train.training.train_eval_loop import (
     train_eval_loop,
     train_eval_loop_nomad,
+    train_eval_loop_3d_nomad,
     load_model,
 )
 
@@ -362,7 +363,7 @@ def main(config):
             eval_fraction=config["eval_fraction"],
         )
     elif config["model_type"] == "nomad3d":
-        train_eval_loop_nomad3d(
+        train_eval_loop_3d_nomad(
         )
 
 

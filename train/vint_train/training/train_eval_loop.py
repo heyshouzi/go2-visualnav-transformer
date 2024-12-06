@@ -282,6 +282,17 @@ def train_eval_loop_nomad(
     wandb.log({})
     print()
 
+
+def train_eval_loop_3d_nomad()
+
+
+
+
+
+
+
+
+
 def load_model(model, model_type, checkpoint: dict) -> None:
     """Load model from checkpoint."""
     if model_type == "nomad":

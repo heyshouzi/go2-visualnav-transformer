@@ -4,7 +4,7 @@ import argparse
 import tqdm
 import yaml
 import rosbag
-from nomad3d_train.process_data.process_data_utils import *
+from vint_train.process_data.process_data_utils import *
 
 def main(args: argparse.Namespace):
 
