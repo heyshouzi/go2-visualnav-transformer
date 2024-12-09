@@ -38,6 +38,7 @@ num_diffusion_iters: 10
 
 # mask 
 goal_mask_prob: 0.5
+lidar_mask_prob: 0.5
 
 # normalization for the action space
 normalize: True

@@ -362,20 +362,31 @@ def main(config):
             use_wandb=config["use_wandb"],
             eval_fraction=config["eval_fraction"],
         )
-    elif config["model_type"] == "nomad3d":
+    elif config["model_type"] == "3d_nomad":
+        ## TODO:处理lidar mask 
         train_eval_loop_3d_nomad(
+            train_model=config["train"],
+            model=model,
+            optimizer=optimizer,
+            lr_scheduler=scheduler,
+            noise_scheduler=noise_scheduler,
+            train_loader=train_loader,
+            test_dataloaders=test_dataloaders,
+            transform=transform,
+            goal_mask_prob=config["goal_mask_prob"],
+            epochs=config["epochs"],
+            device=device,
+            project_folder=config["project_folder"],
+            print_log_freq=config["print_log_freq"],
+            wandb_log_freq=config["wandb_log_freq"],
+            image_log_freq=config["image_log_freq"],
+            num_images_log=config["num_images_log"],
+            current_epoch=current_epoch,
+            alpha=float(config["alpha"]),
+            use_wandb=config["use_wandb"],
+            eval_fraction=config["eval_fraction"],
+            eval_freq=config["eval_freq"],
         )
-
-
-
-
-
-
-
-
-
-
-
     else:
         train_eval_loop_nomad(
             train_model=config["train"],
