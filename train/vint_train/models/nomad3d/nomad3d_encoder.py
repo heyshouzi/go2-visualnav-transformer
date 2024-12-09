@@ -6,7 +6,7 @@ from typing import Optional
 from typing import List, Dict, Optional, Tuple, Callable
 from efficientnet_pytorch import EfficientNet
 from vint_train.models.vint.self_attention import PositionalEncoding
-from lidar_encoder import dp3Net,PointNet,PointNetplusplus,PointTransformer
+from .lidar_encoder import dp3Net,PointNet,PointNetPlusPlus,PointTransformer
 
 
 
@@ -47,7 +47,7 @@ class NoMaD3D_encoder(nn.Module):
         elif lidar_encoder == "pointnet":
             self.lidar_encoder = PointNet(in_channels=3, out_channels=lidar_encoding_size)
         elif lidar_encoder == "pointnet++":
-            self.lidar_encoder = PointNetplusplus(in_channels=3, out_channels=lidar_encoding_size)
+            self.lidar_encoder = PointNetPlusPlus(in_channels=3, out_channels=lidar_encoding_size)
         elif lidar_encoder == "point-transformer":
             self.lidar_encoder = PointTransformer(in_channels=3, out_channels=lidar_encoding_size)
         else:

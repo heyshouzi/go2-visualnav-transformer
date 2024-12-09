@@ -4,7 +4,6 @@ import argparse
 import numpy as np
 import yaml
 import time
-import pdb
 
 import torch
 import torch.nn as nn
@@ -27,8 +26,8 @@ from vint_train.models.gnm.gnm import GNM
 from vint_train.models.vint.vint import ViNT
 from vint_train.models.vint.vit import ViT
 from vint_train.models.nomad.nomad import NoMaD, DenseNetwork
-from train.vint_train.models.nomad3d.nomad3d_encoder import NoMaD3D_encoder
-from train.vint_train.models.nomad3d.nomad3d import NoMaD3D
+from vint_train.models.nomad3d.nomad3d_encoder import NoMaD3D_encoder
+from vint_train.models.nomad3d.nomad3d import NoMaD3D
 from vint_train.models.nomad.nomad_vint import NoMaD_ViNT, replace_bn_with_gn
 from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
 
@@ -233,7 +232,7 @@ def main(config):
                 mha_num_attention_layers=config["mha_num_attention_layers"],
                 mha_ff_dim_factor=config["mha_ff_dim_factor"],
                 lidar_encoder=config["lidar_encoder"],
-                lidar_encoding_size=config["obs_encoder"]
+                lidar_encoding_size=config["encoding_size"]
             )
             vision_lidar_encoder = replace_bn_with_gn(vision_lidar_encoder)
             noise_pred_net = ConditionalUnet1D(
@@ -374,6 +373,7 @@ def main(config):
             test_dataloaders=test_dataloaders,
             transform=transform,
             goal_mask_prob=config["goal_mask_prob"],
+            lidar_mask_prob=config["lidar_mask_prob"],
             epochs=config["epochs"],
             device=device,
             project_folder=config["project_folder"],
@@ -424,13 +424,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         "-c",
-        default="config/vint.yaml",
+        default="config/3d-nomad.yaml",
         type=str,
         help="Path to the config file in train_config folder",
     )
     args = parser.parse_args()
 
-    with open("config/defaults.yaml", "r") as f:
+    with open("config/3d-nomad.yaml", "r") as f:
         default_config = yaml.safe_load(f)
 
     config = default_config
@@ -455,7 +455,7 @@ if __name__ == "__main__":
         wandb.init(
             project=config["project_name"],
             settings=wandb.Settings(start_method="fork"),
-            entity="gnmv2", # TODO: change this to your wandb entity
+            entity="1508104780-ucas", # TODO: change this to your wandb entity
         )
         wandb.save(args.config, policy="now")  # save the config file
         wandb.run.name = config["run_name"]

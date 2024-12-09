@@ -7,27 +7,18 @@ import numpy as np
 # https://arxiv.org/pdf/2403.03954
 class dp3Net(nn.Module):
     def __init__(self,
-                 in_channels: int=3,
-                 out_channels: int=256,
-                 use_layernorm: bool=False,
-                 final_norm: str='none',
-                 use_projection: bool=True,
-                 **kwargs
-                 ):
-        """_summary_
-
-        Args:
-            in_channels (int): feature size of input (3 or 6)
-            input_transform (bool, optional): whether to use transformation for coordinates. Defaults to True.
-            feature_transform (bool, optional): whether to use transformation for features. Defaults to True.
-            is_seg (bool, optional): for segmentation or classification. Defaults to False.
-        """
+                 in_channels: int = 3,
+                 out_channels: int = 256,
+                 use_layernorm: bool = False,
+                 final_norm: str = 'none',
+                 use_projection: bool = True,
+                 **kwargs):
         super().__init__()
+
         block_channel = [64, 128, 256]
-  
-        
+
         assert in_channels == 3, f"dp3Net only supports 3 channels, but got {in_channels}"
-       
+
         self.mlp = nn.Sequential(
             nn.Linear(in_channels, block_channel[0]),
             nn.LayerNorm(block_channel[0]) if use_layernorm else nn.Identity(),
@@ -39,14 +30,16 @@ class dp3Net(nn.Module):
             nn.LayerNorm(block_channel[2]) if use_layernorm else nn.Identity(),
             nn.ReLU(),
         )
-        
+
+        print(f"block_channel[-1]: {block_channel[-1]}, out_channels: {out_channels}")
+
         if final_norm == 'layernorm':
             self.final_projection = nn.Sequential(
-                nn.Linear(block_channel[-1], out_channels),
+                nn.Linear(int(block_channel[-1]), int(out_channels)),
                 nn.LayerNorm(out_channels)
             )
         elif final_norm == 'none':
-            self.final_projection = nn.Linear(block_channel[-1], out_channels)
+            self.final_projection = nn.Linear(int(block_channel[-1]), int(out_channels))
         else:
             raise NotImplementedError(f"final_norm: {final_norm}")
 
@@ -54,9 +47,9 @@ class dp3Net(nn.Module):
         if not use_projection:
             self.final_projection = nn.Identity()
             print("[dp3Net] not use projection")
-                  
+
     def forward(self, x: torch.Tensor):
-        if len(x.shape) == 4: #(batch_size, context_size, n, 3) or (batch_size, 1, n, 3)
+        if len(x.shape) == 4:  # (batch_size, context_size, n, 3) or (batch_size, 1, n, 3)
             batch_size, context_size, n, in_channels = x.shape
             x = x.view(batch_size * context_size, n, in_channels)  # (batch_size * context_size, n, 3)
             x = x.view(batch_size * context_size * n, in_channels)  # (batch_size * context_size * n, 3)
@@ -72,9 +65,10 @@ class dp3Net(nn.Module):
             x = torch.max(x, 1)[0]  # (batch_size, out_channels)
         else:
             raise ValueError("Input shape must be (batch_size, context_size, n, 3) or (batch_size, n, 3)")
-        
+
         x = self.final_projection(x)  # (batch_size, context_size, out_channels) or (batch_size, out_channels)
         return x
+
 
 
 # PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation
