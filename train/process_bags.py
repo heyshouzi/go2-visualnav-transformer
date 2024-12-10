@@ -9,7 +9,7 @@ from vint_train.process_data.process_data_utils import *
 def main(args: argparse.Namespace):
 
     # load the config file
-    with open("nomad3d_train/process_data/process_bags_config.yaml", "r") as f:
+    with open("vint_train/process_data/process_bags_config.yaml", "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     # create output dir if it doesn't exist

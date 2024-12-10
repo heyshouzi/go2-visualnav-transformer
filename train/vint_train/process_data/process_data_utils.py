@@ -76,14 +76,48 @@ def filter_lidar(msg) -> np.ndarray:
     # 提取点云数据
     point_cloud_list = list(pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
     
-
     # 将点云数据转换为 numpy 数组
     point_cloud_array = np.array(point_cloud_list, dtype=np.float32)
     
-    # 过滤掉 x 坐标小于 0 的点
-    # filtered_point_cloud_array = point_cloud_array[point_cloud_array[:, 0] >= 0]
+    # 过滤掉 z 坐标过高的点（例如 z_max = 3.5）
+    z_max = 3.5
+    filtered_point_cloud_array = point_cloud_array[point_cloud_array[:, 2] <= z_max]
     
-    return point_cloud_array
+    # 过滤掉地面（例如 z_ground = 0.1）
+    z_ground = 0.1
+    filtered_point_cloud_array = filtered_point_cloud_array[filtered_point_cloud_array[:, 2] >= z_ground]
+    
+    # 将 numpy 数组转换为 Open3D PointCloud 对象
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(filtered_point_cloud_array)
+    
+    # 统计去噪：去除异常点
+    cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    pcd_filtered = pcd.select_by_index(ind)
+    
+    # 获取过滤后的点云数据
+    filtered_point_cloud_array = np.asarray(pcd_filtered.points)
+    
+    # 目标点云数量
+    target_num_points = 4000
+    
+    # 获取当前点云数量
+    current_points = len(filtered_point_cloud_array)
+    
+    if current_points > target_num_points:
+        # 随机下采样
+        sampling_ratio = target_num_points / current_points
+        pcd_downsampled = pcd_filtered.random_down_sample(sampling_ratio=sampling_ratio)
+        final_point_cloud_array = np.asarray(pcd_downsampled.points)
+    elif current_points < target_num_points:
+        # 用零填充
+        missing_points = target_num_points - current_points
+        zero_points = np.zeros((missing_points, 3), dtype=np.float32)
+        final_point_cloud_array = np.vstack((filtered_point_cloud_array, zero_points))
+    else:
+        final_point_cloud_array = filtered_point_cloud_array
+    
+    return final_point_cloud_array
 
 def process_tartan_img(msg) -> Image:
     """
