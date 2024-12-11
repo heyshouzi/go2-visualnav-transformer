@@ -116,7 +116,10 @@ def filter_lidar(msg) -> np.ndarray:
         final_point_cloud_array = np.vstack((filtered_point_cloud_array, zero_points))
     else:
         final_point_cloud_array = filtered_point_cloud_array
-    
+    # 确保最终点云数组的形状为 (4000, 3)
+    if final_point_cloud_array.shape[0] != target_num_points:
+        final_point_cloud_array = np.resize(final_point_cloud_array, (target_num_points, 3))    
+    assert final_point_cloud_array.shape[0] == target_num_points, f"Final point cloud array has incorrect shape:{final_point_cloud_array.shape}"
     return final_point_cloud_array
 
 def process_tartan_img(msg) -> Image:
