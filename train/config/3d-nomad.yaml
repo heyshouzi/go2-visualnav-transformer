@@ -23,7 +23,9 @@ seed: 0
 # model params
 model_type: 3d_nomad
 vision_lidar_encoder: 3d_nomad_encoder
-encoding_size: 256
+lidar_encoding_size: 256
+obs_encoding_size: 256
+encoding_size: 512
 obs_encoder: efficientnet-b0
 lidar_encoder: dp3net
 attn_unet: False

@@ -31,9 +31,9 @@ class NoMaD3D(nn.Module):
         return output
 
 
-class DenseNetwork(nn.Module):
+class DenseNetwork_3d(nn.Module):
     def __init__(self, embedding_dim):
-        super(DenseNetwork, self).__init__()
+        super(DenseNetwork_3d, self).__init__()
         
         self.embedding_dim = embedding_dim 
         self.network = nn.Sequential(

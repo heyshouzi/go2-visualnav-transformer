@@ -27,7 +27,7 @@ from vint_train.models.vint.vint import ViNT
 from vint_train.models.vint.vit import ViT
 from vint_train.models.nomad.nomad import NoMaD, DenseNetwork
 from vint_train.models.nomad3d.nomad3d_encoder import NoMaD3D_encoder
-from vint_train.models.nomad3d.nomad3d import NoMaD3D
+from vint_train.models.nomad3d.nomad3d import NoMaD3D, DenseNetwork_3d
 from vint_train.models.nomad.nomad_vint import NoMaD_ViNT, replace_bn_with_gn
 from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
 
@@ -227,12 +227,12 @@ def main(config):
             vision_lidar_encoder = NoMaD3D_encoder(
                 context_size=config["context_size"],
                 obs_encoder=config["obs_encoder"],
-                obs_encoding_size=config["encoding_size"],
+                obs_encoding_size=config["obs_encoding_size"],
                 mha_num_attention_heads=config["mha_num_attention_heads"],
                 mha_num_attention_layers=config["mha_num_attention_layers"],
                 mha_ff_dim_factor=config["mha_ff_dim_factor"],
                 lidar_encoder=config["lidar_encoder"],
-                lidar_encoding_size=config["encoding_size"]
+                lidar_encoding_size=config["lidar_encoding_size"]
             )
             vision_lidar_encoder = replace_bn_with_gn(vision_lidar_encoder)
             noise_pred_net = ConditionalUnet1D(
@@ -241,7 +241,7 @@ def main(config):
                 down_dims=config["down_dims"],
                 cond_predict_scale=config["cond_predict_scale"],
             )
-            dist_pred_network = DenseNetwork(embedding_dim=config["encoding_size"])
+            dist_pred_network = DenseNetwork_3d(embedding_dim=config["encoding_size"])
         
             model = NoMaD3D(
                 vision_lidar_encoder=vision_lidar_encoder,

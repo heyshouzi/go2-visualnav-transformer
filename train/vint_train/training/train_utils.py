@@ -530,6 +530,8 @@ def _compute_losses_3d_nomad(
     noise_scheduler,
     batch_obs_images,
     batch_goal_images,
+    batch_obs_lidars,
+    batch_goal_lidars,
     batch_dist_label: torch.Tensor,
     batch_action_label: torch.Tensor,
     device: torch.device,
@@ -909,7 +911,6 @@ def train_3d_nomad(
             
             # Get distance label
             distance = distance.float().to(device)
-
             deltas = get_delta(actions)
             ndeltas = normalize_data(deltas, ACTION_STATS)
             naction = from_numpy(ndeltas).to(device)

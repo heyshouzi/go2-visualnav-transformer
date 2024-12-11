@@ -31,8 +31,6 @@ class dp3Net(nn.Module):
             nn.ReLU(),
         )
 
-        print(f"block_channel[-1]: {block_channel[-1]}, out_channels: {out_channels}")
-
         if final_norm == 'layernorm':
             self.final_projection = nn.Sequential(
                 nn.Linear(int(block_channel[-1]), int(out_channels)),

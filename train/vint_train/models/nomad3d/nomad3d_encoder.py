@@ -25,6 +25,7 @@ class NoMaD3D_encoder(nn.Module):
         super().__init__()
         self.obs_encoding_size = obs_encoding_size
         self.goal_encoding_size = obs_encoding_size
+        self.lidar_encoding_size = lidar_encoding_size
         self.context_size = context_size
 
         # obs encoder
@@ -66,12 +67,12 @@ class NoMaD3D_encoder(nn.Module):
             self.compress_goal_enc = nn.Identity()
 
         # Positional encoding and self-attention
-        self.positional_encoding = PositionalEncoding(self.obs_encoding_size, 
+        self.positional_encoding = PositionalEncoding(self.obs_encoding_size + self.lidar_encoding_size, 
                                                       max_seq_len=self.context_size + 2)
         self.sa_layer = nn.TransformerEncoderLayer(
-            d_model=self.obs_encoding_size,
+            d_model=self.obs_encoding_size + self.lidar_encoding_size,
             nhead=mha_num_attention_heads,
-            dim_feedforward=mha_ff_dim_factor * self.obs_encoding_size,
+            dim_feedforward=mha_ff_dim_factor * (self.obs_encoding_size + lidar_encoding_size),
             activation="gelu",
             batch_first=True,
             norm_first=True
@@ -88,7 +89,8 @@ class NoMaD3D_encoder(nn.Module):
         input_goal_mask: torch.Tensor = None
     ) -> torch.Tensor:
         device = obs_img.device
-
+        assert obs_img.shape[0] == obs_lidar.shape[0],f"""obs_img and obs_lidar should have the same batch size,
+        but obs_img got {obs_img.shape[0]}, obs_lidar got:{obs_lidar.shape[0]} respectively."""
         # goal encoding
         goal_encoding = torch.zeros((obs_img.size()[0], 1, self.goal_encoding_size)).to(device)
 
@@ -130,17 +132,15 @@ class NoMaD3D_encoder(nn.Module):
             goal_lidar = torch.zeros_like(goal_lidar)
         obs_lidar_encoding = self.lidar_encoder(obs_lidar)  # 处理 LiDAR 数据
         goal_lidar_encoding = self.lidar_encoder(goal_lidar)  # 处理目标 LiDAR 数据
-
-        batch_size, context_size, _, _ = obs_img.shape
-        obs_lidar_encoding = obs_lidar_encoding.view(batch_size, context_size, -1)
-        obs_encoding = torch.cat((obs_encoding, obs_lidar_encoding), dim=-1)
-
-        # Fusion of goal_img and goal_lidar
-        goal_lidar_encoding = goal_lidar_encoding.view(batch_size, -1)
-        goal_encoding = torch.cat((goal_encoding, goal_lidar_encoding.unsqueeze(1)), dim=-1)
-
+        print(f"obs_lidar_encoding.shape: {obs_lidar_encoding.shape}")
+        print(f"goal_lidar_encoding.shape: {goal_lidar_encoding.shape}")
+        obs_lidar_encoding = torch.cat([obs_lidar_encoding, goal_lidar_encoding], dim=-2)
         # 合并视觉信息与 LiDAR 信息
-        combined_encoding = torch.cat((obs_encoding, goal_encoding), dim=1)
+        
+        print(f"obs_lidar_encoding.shape: {obs_lidar_encoding.shape}")
+        print(f"obs_encoding.shape: {obs_encoding.shape}")
+        combined_encoding = torch.cat((obs_encoding, obs_lidar_encoding), dim=-1)
+
         # 
         if self.positional_encoding:
             combined_encoding = self.positional_encoding(combined_encoding)
@@ -166,7 +166,6 @@ class NoMaD3D_encoder(nn.Module):
             obs_encoding_tokens = obs_encoding_tokens * avg_mask
 
         obs_encoding_tokens = torch.mean(obs_encoding_tokens, dim=1)
-
         return obs_encoding_tokens
 
 
