@@ -823,7 +823,7 @@ def train_3d_nomad(
     use_wandb: bool = True,
 ):
     
-    print("Starting training")
+   
     """
     Train the model for one epoch.
 
@@ -843,6 +843,7 @@ def train_3d_nomad(
         num_images_log: number of images to log
         use_wandb: whether to use wandb
     """
+    print("Starting training")
     goal_mask_prob = torch.clip(torch.tensor(goal_mask_prob), 0, 1)
     lidar_mask_prob = torch.clip(torch.tensor(lidar_mask_prob), 0, 1)
     model.train()
@@ -1334,7 +1335,7 @@ def evaluate_3d_nomad(
                                         obs_lidar=batch_obs_lidars, 
                                         goal_lidar=batch_goal_lidars,
                                         lidar_mask = None,
-                                        input_goal_mask=rand_mask_cond)
+                                        input_goal_mask=rand_goal_mask)
 
             obsgoal_cond = ema_model("vision_lidar_encoder", 
                                         obs_img=batch_obs_images, 
@@ -1407,6 +1408,8 @@ def evaluate_3d_nomad(
                             noise_scheduler,
                             batch_obs_images,
                             batch_goal_images,
+                            batch_obs_lidars,
+                            batch_goal_lidars,
                             distance.to(device),
                             actions.to(device),
                             device,
@@ -1717,8 +1720,8 @@ def visualize_3d_nomad_diffusion_action_distribution(
 
     for obs_image, goal_image, obs_lidar, goal_lidar in zip(batch_obs_images_list, 
                                                             batch_goal_images_list, 
-                                                            batch_obs_lidars, 
-                                                            batch_goal_lidars):
+                                                            batch_obs_lidars_list, 
+                                                            batch_goal_lidars_list):
         model_output_dict = model_3d_nomad_output(
             ema_model,
             noise_scheduler,

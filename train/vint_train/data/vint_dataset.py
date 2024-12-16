@@ -372,8 +372,10 @@ class ViNT_Dataset(Dataset):
         obs_lidar = torch.stack([
             self._load_lidar(f, t) for f, t in context])
 
+        
+        # print(f"Sample {i}: obs_img shape={obs_image.shape}, obs_lidar shape={obs_lidar.shape}")
 
-        # Load goal image
+        # Load  goal image
         goal_image = self._load_image(f_goal, goal_time)
         goal_lidar = self._load_lidar(f_goal, goal_time)
         goal_lidar = goal_lidar.unsqueeze(0)
@@ -405,6 +407,7 @@ class ViNT_Dataset(Dataset):
             (distance > self.min_action_distance) and
             (not goal_is_negative)
         )
+
 
         return (
             torch.as_tensor(obs_image, dtype=torch.float32),

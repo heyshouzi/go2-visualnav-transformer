@@ -9,7 +9,6 @@ from vint_train.models.vint.self_attention import PositionalEncoding
 from .lidar_encoder import dp3Net,PointNet,PointNetPlusPlus,PointTransformer
 
 
-
 class NoMaD3D_encoder(nn.Module):
     def __init__(
         self,
@@ -89,9 +88,6 @@ class NoMaD3D_encoder(nn.Module):
         input_goal_mask: torch.Tensor = None
     ) -> torch.Tensor:
         device = obs_img.device
-        assert obs_img.shape[0] == obs_lidar.shape[0],f"""obs_img and obs_lidar should have the same batch size,
-        but obs_img got {obs_img.shape[0]}, obs_lidar got:{obs_lidar.shape[0]} respectively."""
-        # goal encoding
         goal_encoding = torch.zeros((obs_img.size()[0], 1, self.goal_encoding_size)).to(device)
 
         if input_goal_mask is not None:
@@ -132,13 +128,8 @@ class NoMaD3D_encoder(nn.Module):
             goal_lidar = torch.zeros_like(goal_lidar)
         obs_lidar_encoding = self.lidar_encoder(obs_lidar)  # 处理 LiDAR 数据
         goal_lidar_encoding = self.lidar_encoder(goal_lidar)  # 处理目标 LiDAR 数据
-        print(f"obs_lidar_encoding.shape: {obs_lidar_encoding.shape}")
-        print(f"goal_lidar_encoding.shape: {goal_lidar_encoding.shape}")
         obs_lidar_encoding = torch.cat([obs_lidar_encoding, goal_lidar_encoding], dim=-2)
         # 合并视觉信息与 LiDAR 信息
-        
-        print(f"obs_lidar_encoding.shape: {obs_lidar_encoding.shape}")
-        print(f"obs_encoding.shape: {obs_encoding.shape}")
         combined_encoding = torch.cat((obs_encoding, obs_lidar_encoding), dim=-1)
 
         # 
